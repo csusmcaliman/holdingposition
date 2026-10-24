@@ -86,6 +86,15 @@
     opacity: 0; transition: opacity 0.2s; pointer-events: none;
   }
   .toast.on { opacity: 1; }
+  .banner {
+    position: absolute; left: 0; right: 0; top: 24%;
+    display: flex; flex-direction: column; align-items: center; gap: 0.7cqw;
+    text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity 0.35s;
+  }
+  .banner.on { opacity: 1; }
+  .banner .b-eyebrow { font: 600 max(11px, 1.3cqw)/1 var(--body); letter-spacing: 0.24em; text-transform: uppercase; color: var(--hazard); }
+  .banner .b-title { font: 400 max(28px, 5.2cqw)/1 var(--display); text-transform: uppercase; color: var(--text); text-shadow: 0 3px 0 var(--screen), 0 0 28px var(--veil-strong); }
 
   .hud {
     position: absolute; inset: auto 0 0 0;
@@ -99,7 +108,8 @@
   .stat .value { font: 400 max(20px, 3.8cqw)/1 var(--display); font-variant-numeric: tabular-nums; color: var(--text); transition: color 0.2s; }
   .stat.warn .value { color: var(--hazard); }
   .stat.low .value { color: var(--alarm); }
-  .stat.bots { margin-left: auto; align-items: flex-end; }
+  .stat.right { align-items: flex-end; }
+  .stat.push { margin-left: auto; }
 
   .overlay {
     position: absolute; inset: 0;
@@ -114,11 +124,17 @@
   .eyebrow { margin: 0; font: 600 max(10px, 1.1cqw)/1 var(--body); letter-spacing: 0.2em; text-transform: uppercase; color: var(--hazard); }
   .card h1, .card h2 { margin: 0; font: 400 max(34px, 7cqw)/0.9 var(--display); letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance; color: var(--text); }
   .card h2 { font-size: max(28px, 5cqw); }
+  .card h3 { margin: 0; font: 400 max(20px, 2.6cqw)/1 var(--display); text-transform: uppercase; color: var(--text); }
   .card .alarm { color: var(--alarm); }
   .card p { margin: 0; max-width: 46ch; font-size: max(13px, 1.45cqw); line-height: 1.5; }
-  .card .how { color: var(--muted); font-size: max(12px, 1.15cqw); padding-top: max(8px, 1.2cqw); border-top: 1px solid var(--plate); }
+  .card .how, .card .note { color: var(--muted); font-size: max(12px, 1.15cqw); }
+  .card .how { padding-top: max(8px, 1.2cqw); border-top: 1px solid var(--plate); }
   .card .how strong { color: var(--text); font-weight: 600; }
   .card .touch-note { color: var(--hazard); }
+  .card .next-label { color: var(--muted); }
+  .card .threat { font: 600 max(10px, 1.1cqw)/1.3 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--hazard); }
+  .next { width: 100%; display: flex; flex-direction: column; gap: max(6px, 0.7cqw); padding-top: max(8px, 1.2cqw); border-top: 1px solid var(--plate); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: max(8px, 1cqw); }
   .btn {
     font: 400 max(15px, 1.75cqw)/1 var(--display);
     letter-spacing: 0.06em; text-transform: uppercase;
@@ -128,6 +144,8 @@
     cursor: pointer;
   }
   .btn:hover { background: var(--hazard-hi); }
+  .btn.ghost { color: var(--text); background: transparent; box-shadow: inset 0 0 0 1px var(--plate); }
+  .btn.ghost:hover { background: var(--steel); }
   .btn:active { transform: translateY(1px); }
   .btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   .stats { margin: 0; display: grid; grid-template-columns: repeat(2, max-content); gap: max(8px, 1cqw) max(28px, 3.6cqw); }
@@ -149,7 +167,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .toast, .stat .value { transition: none; }
+    .toast, .banner, .stat .value { transition: none; }
     .btn:active { transform: none; }
   }
 </style>
@@ -161,42 +179,66 @@
       <div class="vignette"></div>
       <div class="hurt" id="hurt"></div>
       <div class="crosshair" aria-hidden="true"></div>
-      <canvas id="map" class="minimap" width="192" height="192" aria-label="Map of the bunker"></canvas>
+      <canvas id="map" class="minimap" width="192" height="192" aria-label="Map of the level"></canvas>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="banner" id="banner" aria-hidden="true"><span class="b-eyebrow" id="banner-eyebrow"></span><span class="b-title" id="banner-title"></span></div>
       <div class="hud">
         <div class="stat" id="stat-hp"><span class="label">Health</span><span class="value" id="hp">100</span></div>
         <div class="stat" id="stat-ammo"><span class="label">Ammo</span><span class="value" id="ammo">24</span></div>
-        <div class="stat bots"><span class="label">Bots left</span><span class="value" id="bots">8</span></div>
+        <div class="stat right push"><span class="label">Level</span><span class="value" id="lvl">1/5</span></div>
+        <div class="stat right"><span class="label">Bots left</span><span class="value" id="bots">8</span></div>
       </div>
 
       <div class="overlay" id="overlay">
         <section class="card" id="screen-start">
           <div class="tape" aria-hidden="true"></div>
-          <p class="eyebrow">Sector 7 bunker</p>
+          <p class="eyebrow" id="start-eyebrow">Five levels</p>
           <h1>Iron Maze</h1>
-          <p>Security bots have taken over the bunker. Eight of them patrol its rooms and corridors. Shut every one down. Green barrels explode, so keep your distance or wait for a bot to walk past one.</p>
+          <p>Security bots have taken over the bunker. Fight down through five levels, from the outer halls to the reactor core. Each level is bigger and darker, the bots get sharper, and two tougher models join along the way. Green barrels explode.</p>
           <p class="touch-note" id="touch-note" hidden>On a phone or tablet? Iron Maze needs a keyboard and mouse, so open it on a computer to play.</p>
-          <button class="btn" id="btn-start" type="button">Enter the maze</button>
-          <p class="how"><strong>How the 3D works.</strong> The bunker is a flat 24 &times; 24 grid of walls and floor. Every frame, the game sends out 480 rays, one per column of pixels, and draws each wall slice taller the closer its ray hit. The fan of lines on the map is those rays.</p>
+          <div class="btn-row">
+            <button class="btn" id="btn-start" type="button">Enter the maze</button>
+            <button class="btn ghost" id="btn-continue" type="button" hidden>Continue</button>
+          </div>
+          <p class="how"><strong>How the 3D works.</strong> Each level is a flat grid of walls and floor, typed into the code as rows of characters. Every frame, the game sends out 480 rays, one per column of pixels, and draws each wall slice taller the closer its ray hit. The fan of lines on the map is those rays.</p>
         </section>
 
         <section class="card" id="screen-paused" hidden>
-          <p class="eyebrow">Paused</p>
+          <p class="eyebrow" id="pause-eyebrow">Paused</p>
           <h2>Holding position</h2>
           <p id="pause-line"></p>
           <button class="btn" id="btn-resume" type="button">Resume</button>
         </section>
 
+        <section class="card" id="screen-cleared" hidden>
+          <p class="eyebrow" id="cleared-eyebrow"></p>
+          <h2 id="cleared-name"></h2>
+          <dl class="stats" id="cleared-stats"></dl>
+          <div class="next">
+            <p class="eyebrow next-label" id="next-eyebrow"></p>
+            <h3 id="next-name"></h3>
+            <p id="next-brief"></p>
+            <p class="threat" id="next-threat"></p>
+          </div>
+          <p class="note">You keep your health and ammo, topped up to at least 60 health and 20 ammo.</p>
+          <button class="btn" id="btn-next" type="button">Next level</button>
+        </section>
+
         <section class="card" id="screen-dead" hidden>
           <p class="eyebrow alarm">Signal lost</p>
           <h2 class="alarm">Shut down</h2>
+          <p id="dead-line"></p>
           <dl class="stats" id="dead-stats"></dl>
-          <button class="btn" id="btn-retry" type="button">Try again</button>
+          <div class="btn-row">
+            <button class="btn" id="btn-retry" type="button">Retry level</button>
+            <button class="btn ghost" id="btn-restart" type="button">Start over</button>
+          </div>
         </section>
 
         <section class="card" id="screen-won" hidden>
-          <p class="eyebrow">Sector 7 secure</p>
-          <h2>Maze cleared</h2>
+          <p class="eyebrow">All five levels cleared</p>
+          <h2>Bunker secure</h2>
+          <p>The core is offline and every bot in the bunker is scrap.</p>
           <dl class="stats" id="won-stats"></dl>
           <button class="btn" id="btn-again" type="button">Play again</button>
         </section>
@@ -227,48 +269,233 @@
   const PLANE = W / (2 * H);            // camera plane length; keeps wall cells square on a 16:9 screen (FOV about 83 degrees)
   const MOVE_SPEED = 3.2, RUN_MULT = 1.55, TURN_SPEED = 2.6, MOUSE_SENS = 0.0024;
   const FIRE_RATE = 0.28, START_AMMO = 24, MAX_AMMO = 99;
-  const PLAYER_R = 0.25, BOT_R = 0.28, BOT_SPEED = 1.7, BOT_HP = 3, HEAR_STEPS = 11;
-  const BLAST_R = 2.5, BARREL_SCALE = 0.62;
-  const AMBIENT = 0.42, LAMP_I = 0.95, LAMP_R = 4.6, LMR = 8;   // lighting: base level, lamp strength, lamp reach, light-map cells per tile
+  const NEXT_MIN_HP = 60, NEXT_MIN_AMMO = 20;                   // top-up when you move on to the next level
+  const PLAYER_R = 0.25, BLAST_R = 2.5, BARREL_SCALE = 0.62;
+  const LAMP_I = 0.95, LAMP_R = 4.6, LMR = 8;                   // lamp strength, lamp reach, light-map cells per tile
   const FLOOR = 0, CEIL = 1, MID = 2;                           // where a sprite is pinned vertically
   const MAX_PITCH = Math.round(H * 0.42), KEY_LOOK_SPEED = 160;   // looking up/down, in screen pixels the horizon can move
   const GUN_W = 150, GUN_H = 120;
   const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const FACING = { E: 0, S: Math.PI / 2, W: Math.PI, N: -Math.PI / 2 };
+  const SAVE_KEY = 'iron-maze-reached';
+  const DOT = String.fromCharCode(183), LEFT = String.fromCharCode(8592), RIGHT = String.fromCharCode(8594);
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------------------------------------------------------------------------
-  // Level. One character per tile.
-  //   #  brick wall    S  stone wall    W  wood wall    M  tech wall    .  floor
-  //   P  player start  E  security bot  H  medkit  A  energy cells  l  ceiling lamp  b  explosive barrel
+  // Bot models. A level's skill numbers (further down) make every model sharper.
+  //   hp: shots to destroy   speed: tiles per second   acc: aim multiplier   dmg: damage per hit
+  //   aim: seconds of warning (eye flare) before firing   cool: pause between attacks
+  //   burst: shots per attack   pain: chance a hit staggers it   drop: what it leaves behind
   // ---------------------------------------------------------------------------
-  const LEVEL = [
-    '#########WWWWWWWSSSSSSSS',
-    '#.......#.......S.....HS',
-    '#.P.....#....E..S......S',
-    '#...l...........S..l...S',
-    '#.......#...l...S...E..S',
-    '#.......#..............S',
-    '#.......#.A.....S......S',
-    '####.####WWW.WWWSSSS.SS#',
-    '#......l...........b...#',
-    '#..............l.....E.#',
-    '#MMMM.MMMMMSSS.SSSSS.SS#',
-    '#A........M...........HS',
-    '#......M..M.b...l......S',
-    '#..E.l.................S',
-    '#.........M...S....S...S',
-    '#..M....E.M............S',
-    '#........HM......E.....S',
-    '#MM.MMMMMMM.....b......S',
-    '#.......A.#............S',
-    '#.........#...S....S...S',
-    '#...l.E.........l...b..S',
-    '#.H.......#..........E.S',
-    '#.........#A...........S',
-    '###########SSSSSSSSSSSSS',
+  const BOT_TYPES = {
+    E: { name: 'sentry', plural: 'sentries', hp: 3, speed: 1.7, r: 0.28, scale: 1, acc: 1, dmg: [5, 11], aim: 0.4, cool: [0.9, 2.1], burst: 1, gap: 0.16, pain: 0.7, drop: ['ammo', 4] },
+    R: { name: 'hunter', plural: 'hunters', hp: 4, speed: 2.6, r: 0.26, scale: 0.9, acc: 1.05, dmg: [4, 9], aim: 0.3, cool: [0.6, 1.4], burst: 1, gap: 0.14, pain: 0.6, drop: ['ammo', 6] },
+    T: { name: 'warden', plural: 'wardens', hp: 9, speed: 1.15, r: 0.36, scale: 1, acc: 0.9, dmg: [5, 9], aim: 0.55, cool: [1.6, 2.6], burst: 3, gap: 0.13, pain: 0.25, drop: ['health', 15] },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Levels. Each map is one character per tile:
+  //   #  brick wall    S  stone wall    W  wood wall    M  tech wall    .  floor
+  //   P  player start  E  sentry  R  hunter  T  warden
+  //   H  medkit  A  energy cells (ammo)  l  ceiling lamp  b  explosive barrel
+  // facing: which way you look at the start (N, E, S, W). ambient: how bright the unlit areas are.
+  // skill: acc (aim), dmg (damage), react (warning time before a shot), cool (time between attacks)
+  //        multiply every bot's numbers; sight and hear are in tiles.
+  // ---------------------------------------------------------------------------
+  const LEVELS = [
+    {
+      name: 'Sector 7 bunker',
+      brief: 'Eight sentries patrol the outer bunker. A good place to learn the controls.',
+      facing: 'E', ambient: 0.42,
+      skill: { acc: 1, dmg: 1, react: 1, cool: 1, sight: 11, hear: 11 },
+      map: [
+        '#########WWWWWWWSSSSSSSS',
+        '#.......#.......S.....HS',
+        '#.P.....#....E..S......S',
+        '#...l...........S..l...S',
+        '#.......#...l...S...E..S',
+        '#.......#..............S',
+        '#.......#.A.....S......S',
+        '####.####WWW.WWWSSSS.SS#',
+        '#......l...........b...#',
+        '#..............l.....E.#',
+        '#MMMM.MMMMMSSS.SSSSS.SS#',
+        '#A........M...........HS',
+        '#......M..M.b...l......S',
+        '#..E.l.................S',
+        '#.........M...S....S...S',
+        '#..M....E.M............S',
+        '#........HM......E.....S',
+        '#MM.MMMMMMM.....b......S',
+        '#.......A.#............S',
+        '#.........#...S....S...S',
+        '#...l.E.........l...b..S',
+        '#.H.......#..........E.S',
+        '#.........#A...........S',
+        '###########SSSSSSSSSSSSS',
+      ],
+    },
+    {
+      name: 'Storage depot',
+      brief: 'Aisles of crates give you cover, and give the bots places to hide. Hunters join the patrols: red, fast and quick on the trigger.',
+      facing: 'N', ambient: 0.42,
+      skill: { acc: 1.05, dmg: 1.1, react: 0.95, cool: 0.95, sight: 12, hear: 12 },
+      map: [
+        'SSSSSSSSSSSSSSSSSSSSSMMMMMMM',
+        'WA......W..........EMA.....M',
+        'W.......W.WW.WW.WW..M......M',
+        'W...l...W.WW.WW.WW..M......M',
+        'W...........l.......M..l...M',
+        'W.......W......E...........M',
+        'W.....E.W.WW.WW.WW..M....E.M',
+        'W.......W.WW.WW.WW..M......M',
+        'WWWW.WWWW.........R.M.b....M',
+        'S.......Sb..........M.M..M.M',
+        'S.S...S.S.WWEWW.WW..M......M',
+        'S.......S.WW.WW.WW..M...R..M',
+        'S.H.l..........l....M..l...M',
+        'S.......S.........b........M',
+        'S.S...S.S.WW.WW.WWE.M......M',
+        'S.......S.WW.WW.WW..M.M..M.M',
+        'S.......S..........AM....b.M',
+        '####.###SSSSSS.SSSSSM......M',
+        '#.......#...........M..E...M',
+        '#.......#..b........M......M',
+        '#...l...#........E..M..l...M',
+        '#.......#.....l............M',
+        '#...P...#..R........M......M',
+        '#.......#...........M......M',
+        '#.......#..........HM.....HM',
+        '#########SSSSSSSSSSSMMMMMMMM',
+      ],
+    },
+    {
+      name: 'Reactor ring',
+      brief: 'Halls circle the reactor chamber, and a Warden guards it. Wardens are heavy and slow, take nine hits, and fire in bursts of three.',
+      facing: 'N', ambient: 0.38,
+      skill: { acc: 1.1, dmg: 1.2, react: 0.9, cool: 0.9, sight: 12, hear: 13 },
+      map: [
+        '#########SSSSSSSSSSSSWWWWWWWWW',
+        '#.......S...........AS......HW',
+        '#.......S.......b....S.......W',
+        '#...E...S...E........S...l...W',
+        '#...l.........l..............W',
+        '#.......S.........R..S...E...W',
+        '#.....R.S............S.......W',
+        '#A......S............S.......W',
+        '#SSS.SSSSSSSSS.SSSSSSSSSS.SSS#',
+        'S.......S............S......AS',
+        'S.......S.l.......Rb.S.b.....S',
+        'S..E....S............S.......S',
+        'S....S..S...MM.MMM...S...E...S',
+        'S.......S...MT...M...S.S...S.S',
+        'S...l...S...M.MM.M...........S',
+        'S...........M.MM.M...S...l...S',
+        'S.S.....S...M...bM...S.......S',
+        'S.....b.S...MMM.MM...S.......S',
+        'S.......S............S..R....S',
+        'S.......S.........l..S.......S',
+        'SH......S............S.......S',
+        '#SSS.SSSSSSSSSS.SSSSSSSSS.SSS#',
+        '#.......#............W.......W',
+        '#.P.....#............W.......W',
+        '#.......#...R........W...E...W',
+        '#...l.........l..............W',
+        '#.......#........E...W...l...W',
+        '#.......#.....b......W.......W',
+        '#.......#A...........W......HW',
+        '#########SSSSSSSSSSSSWWWWWWWWW',
+      ],
+    },
+    {
+      name: 'Command deck',
+      brief: 'Offices line both sides of the main hall. Three Wardens hold the command wing at the east end.',
+      facing: 'S', ambient: 0.34,
+      skill: { acc: 1.15, dmg: 1.3, react: 0.85, cool: 0.85, sight: 13, hear: 14 },
+      map: [
+        'WWWWWWWWWWWWWWWWWWWWWWWWWWWMMMMM',
+        'W.P....WA.....W.....W.....M...HM',
+        'W......W......W........R..M....M',
+        'W...l......R..W..E..W.....M....M',
+        'W......W..l...W..l..W..l.......M',
+        'W......W......W.....W.....M.l..M',
+        'WWW.WWWWWWW.WWWWW.WWWWW.WWM....M',
+        'W......W......W.....W.....M....M',
+        'W......W......W..l..Wb....M.T..M',
+        'W...l..W..E.........W..l..M....M',
+        'W..........l..W...R.W.....M..b.M',
+        'W.....EW......W.....W.....M....M',
+        'W......W......W....AW....HM.l..M',
+        'MMMM.MMMMMM.MMMMM.MMMMM.MMM....M',
+        'M.......b.................M....M',
+        'M.....l.............E.l.....T..M',
+        'M...........R.l................M',
+        'M.................b.......M....M',
+        'MMM.MMMMMM.MMMMMMM.MMMM.MMM.l..M',
+        '#......#.....H#.....#.....M....M',
+        '#......#.b....#.....#.....Mb...M',
+        '#..R...#.........l..#..E..M....M',
+        '#...l..#...l..#.....#.....M.T..M',
+        '#......#......#.....#..l..M....M',
+        '####.#####.######.####.###M....M',
+        '#A.....#......#.....#.....M.l..M',
+        '#......#......#..l........M....M',
+        '#...l......E..#.....#..l.......M',
+        '#......#...l.....R..#.....M....M',
+        '#......#......#.....#.....M....M',
+        '#H.....#......#.....#....AM....M',
+        '###########################MMMMM',
+      ],
+    },
+    {
+      name: 'The core',
+      brief: 'Three rings of walls surround the reactor core, with five Wardens between you and the centre. Use the barrels.',
+      facing: 'E', ambient: 0.3,
+      skill: { acc: 1.2, dmg: 1.4, react: 0.8, cool: 0.8, sight: 14, hear: 15 },
+      map: [
+        '################################',
+        '#...............W..............#',
+        '#.P...l..W......W...E....l.....#',
+        '#........W.....l......W........#',
+        '#.....................W........#',
+        '#....SSSSSSSSSSSSSSSSSSSSSS....#',
+        '#.l..SA..................AS..l.#',
+        '#....S......T..l..........S....#',
+        '#....S..S....b......R..S..S....#',
+        '#....S....................S....#',
+        '#.WW.S....MMMMM.MMMMMM....S.R..#',
+        '#....S....MH......R..M....S....#',
+        '#....S..R.M..l.......M....S.WW.#',
+        '#....S....M..MMMMMM..M.E..S....#',
+        '#....S....M..M..l.M..M....S....#',
+        '#.l....l..MR.M.T.....M.l..S..l.#',
+        '#....S....M.....T.M..M.........#',
+        '#....S....M..M....MT.M....S....#',
+        '#....S.E..M..MMMMMM..M....S....#',
+        '#....S....M.......l..M....S....#',
+        '#.R..S....M.E........M....S..E.#',
+        '#....S....MMMMMM.MMMMM....S....#',
+        '#.WW.S....................S....#',
+        '#....S..S.........T....S..S....#',
+        '#....S....R....l.b........S....#',
+        '#.l..SA..................HS..l.#',
+        '#....SSSSSSSSSSSSSSSSSSSSSS....#',
+        '#....................W.........#',
+        '#...........W..E.....W.........#',
+        '#.....l.....W..l.........l.....#',
+        '#H............................A#',
+        '################################',
+      ],
+    },
   ];
-  const MW = LEVEL[0].length, MH = LEVEL.length;
   const WALL_CODES = { '#': 1, S: 2, W: 3, M: 4 };
+  const countBots = n => {
+    const c = { E: 0, R: 0, T: 0 };
+    for (const row of LEVELS[n].map) for (const ch of row) if (ch in c) c[ch]++;
+    return c;
+  };
+  const threatLine = n => Object.entries(countBots(n)).filter(([, v]) => v)
+    .map(([k, v]) => `${v} ${v === 1 ? BOT_TYPES[k].name : BOT_TYPES[k].plural}`).join(` ${DOT} `);
 
   // ---------------------------------------------------------------------------
   // DOM
@@ -280,10 +507,10 @@
   const zbuf = new Float32Array(W), hitX = new Float32Array(W), hitY = new Float32Array(W);
   vctx.imageSmoothingEnabled = false;
   const ui = {
-    hp: $('hp'), ammo: $('ammo'), bots: $('bots'), hpStat: $('stat-hp'), ammoStat: $('stat-ammo'),
-    toast: $('toast'), hurt: $('hurt'), overlay: $('overlay'), pauseLine: $('pause-line'),
-    deadStats: $('dead-stats'), wonStats: $('won-stats'),
-    screens: { start: $('screen-start'), paused: $('screen-paused'), dead: $('screen-dead'), won: $('screen-won') },
+    hp: $('hp'), ammo: $('ammo'), bots: $('bots'), lvl: $('lvl'), hpStat: $('stat-hp'), ammoStat: $('stat-ammo'),
+    toast: $('toast'), hurt: $('hurt'), overlay: $('overlay'),
+    banner: $('banner'), bannerEyebrow: $('banner-eyebrow'), bannerTitle: $('banner-title'),
+    screens: { start: $('screen-start'), paused: $('screen-paused'), cleared: $('screen-cleared'), dead: $('screen-dead'), won: $('screen-won') },
   };
   const css = getComputedStyle(document.documentElement);
   const token = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
@@ -296,6 +523,7 @@
   const fog = d => 1 / (1 + d * d * 0.012);
   const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
   const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const between = ([lo, hi]) => lo + Math.random() * (hi - lo);
 
   function rng(seed) {
     return () => {
@@ -335,7 +563,7 @@
     }
     return px;
   }
-  // A sprite keeps its pixels plus which columns have anything in them, for pixel-accurate hit tests.
+  // A sprite keeps its pixels plus which columns have anything in them, so empty columns can be skipped.
   function sprite(canvas) {
     const px = pixels(canvas), cols = new Uint8Array(TEX);
     for (let x = 0; x < TEX; x++) for (let y = 0; y < TEX; y++) if ((px[y * TEX + x] >>> 24) >= 128) { cols[x] = 1; break; }
@@ -458,38 +686,51 @@
     })), 10);
   }
 
-  function drawBot({ leg = 0, eye = 1, flash = false, tilt = 0, sink = 0, pain = 0 }) {
+  // Colour schemes for the three bot models. Wardens are drawn bulkier, with a blaster on each arm.
+  const PALETTES = {
+    E: { hi: '#a6b0bb', lo: '#58616b', plate: '#48505a', limb: '#3a424b', leg: '#2a3036', joint: '#5b6570', foot: '#454e58', hip: '#20252a', claw: '#272c32', head: '#343a42', core: '#f2b33d', eye: '#ff3b2f', eyeHot: '#ffb2a6', eyeCore: '#ff9a8c' },
+    R: { hi: '#d9725c', lo: '#7c2c22', plate: '#5a2620', limb: '#4a2a26', leg: '#2f2523', joint: '#7a4a40', foot: '#4d3632', hip: '#231a19', claw: '#2e2220', head: '#2e2524', core: '#ffd23d', eye: '#ffd23d', eyeHot: '#fff6c8', eyeCore: '#fff0a0' },
+    T: { hi: '#9db2cf', lo: '#3d4a5f', plate: '#2a3444', limb: '#36445a', leg: '#252d39', joint: '#5a6c86', foot: '#36425a', hip: '#1a2029', claw: '#252d39', head: '#26303d', core: '#58d6ff', eye: '#58d6ff', eyeHot: '#d8f6ff', eyeCore: '#b8efff', bulky: true },
+  };
+
+  function drawBot(pal, { leg = 0, eye = 1, flash = false, tilt = 0, sink = 0, pain = 0 }) {
     return paint(TEX, TEX, g => {
       g.translate(32, 63); g.rotate(tilt); g.translate(-32, -63 + sink);
+      const B = pal.bulky ? 1 : 0;
       const l1 = leg === 1 ? 3 : 0, l2 = leg === 2 ? 3 : 0;
+      const lw = 8 + B * 3, lxa = 21 - B * 3, lxb = 35;
       // legs and feet
-      g.fillStyle = '#2a3036'; g.fillRect(21, 44, 8, 16 - l1); g.fillRect(35, 44, 8, 16 - l2);
-      g.fillStyle = '#5b6570'; g.fillRect(22, 50 - l1, 6, 3); g.fillRect(36, 50 - l2, 6, 3);
-      g.fillStyle = '#454e58'; g.fillRect(19, 59 - l1, 12, 4); g.fillRect(33, 59 - l2, 12, 4);
-      g.fillStyle = '#20252a'; g.fillRect(20, 40, 24, 6);
-      // arms; the right one carries a blaster pointed at you
-      g.fillStyle = '#3a424b'; g.fillRect(8, 24, 7, 16); g.fillRect(49, 24, 7, 12);
-      g.fillStyle = '#272c32'; g.fillRect(7, 38, 9, 5);
-      g.fillStyle = '#181b1f'; g.fillRect(46, 34, 13, 10);
-      g.fillStyle = '#ff4b3e'; circle(g, 52.5, 39, 2.8);
-      g.fillStyle = '#0a0b0d'; circle(g, 52.5, 39, 1.4);
+      g.fillStyle = pal.leg; g.fillRect(lxa, 44, lw, 16 - l1); g.fillRect(lxb, 44, lw, 16 - l2);
+      g.fillStyle = pal.joint; g.fillRect(lxa + 1, 50 - l1, lw - 2, 3); g.fillRect(lxb + 1, 50 - l2, lw - 2, 3);
+      g.fillStyle = pal.foot; g.fillRect(lxa - 2, 59 - l1, lw + 4, 4); g.fillRect(lxb - 2, 59 - l2, lw + 4, 4);
+      g.fillStyle = pal.hip; g.fillRect(20 - B * 3, 40, 24 + B * 6, 6);
+      // arms, each ending in a blaster pointed at you (wardens) or one blaster and a claw
+      const tw = 36 + B * 10, tl = 32 - tw / 2, al = tl - 6, ar = tl + tw - 1;
+      const blaster = cx => {
+        g.fillStyle = '#181b1f'; g.fillRect(cx - 6.5, 34, 13, 10);
+        g.fillStyle = '#ff4b3e'; circle(g, cx, 39, 2.8);
+        g.fillStyle = '#0a0b0d'; circle(g, cx, 39, 1.4);
+        if (flash) { g.fillStyle = '#ffe9a0'; star(g, cx, 39, 12, 4, 8); g.fillStyle = '#ffffff'; circle(g, cx, 39, 4); }
+      };
+      g.fillStyle = pal.limb; g.fillRect(al, 24, 7, B ? 12 : 16); g.fillRect(ar, 24, 7, 12);
+      if (B) blaster(al + 3.5); else { g.fillStyle = pal.claw; g.fillRect(al - 1, 38, 9, 5); }
       // torso with a hazard-striped belly
       const steel = g.createLinearGradient(0, 19, 0, 43);
-      steel.addColorStop(0, '#a6b0bb'); steel.addColorStop(1, '#58616b');
-      g.fillStyle = steel; rrect(g, 14, 19, 36, 24, 4); g.fill();
-      g.fillStyle = '#48505a'; g.fillRect(19, 23, 26, 11);
-      g.fillStyle = '#f2b33d'; g.fillRect(29, 26, 6, 5);
-      g.fillStyle = '#f2b33d'; g.fillRect(14, 36, 36, 5);
-      g.fillStyle = '#16181b'; for (let i = 0; i < 6; i++) g.fillRect(15 + i * 6, 36, 3, 5);
-      g.fillStyle = '#7b8590'; circle(g, 14, 23, 6); circle(g, 50, 23, 6);
+      steel.addColorStop(0, pal.hi); steel.addColorStop(1, pal.lo);
+      g.fillStyle = steel; rrect(g, tl, 19, tw, 24, 4); g.fill();
+      g.fillStyle = pal.plate; g.fillRect(tl + 5, 23, tw - 10, 11);
+      g.fillStyle = pal.core; g.fillRect(29, 26, 6, 5);
+      g.fillStyle = '#f2b33d'; g.fillRect(tl, 36, tw, 5);
+      g.fillStyle = '#16181b'; for (let x = tl + 1; x < tl + tw - 2; x += 6) g.fillRect(x, 36, 3, 5);
+      g.fillStyle = pal.joint; circle(g, tl, 23, 6 + B * 2); circle(g, tl + tw, 23, 6 + B * 2);
+      blaster(ar + 3.5);
       // head, visor, antenna
-      g.fillStyle = '#5b6570'; g.fillRect(37, 0, 2, 6);
-      g.fillStyle = '#ff4b3e'; g.fillRect(36, 0, 4, 2);
-      g.fillStyle = '#343a42'; rrect(g, 22, 5, 20, 15, 3); g.fill();
-      g.fillStyle = '#15181b'; g.fillRect(24, 10, 16, 6);
-      g.fillStyle = eye === 0 ? '#4a1814' : eye > 1 ? '#ffb2a6' : '#ff3b2f'; g.fillRect(25, 11, 14, 4);
-      if (eye) { g.fillStyle = eye > 1 ? '#ffffff' : '#ff9a8c'; g.fillRect(30, 12, 4, 2); }
-      if (flash) { g.fillStyle = '#ffe9a0'; star(g, 52.5, 39, 12, 4, 8); g.fillStyle = '#ffffff'; circle(g, 52.5, 39, 4); }
+      g.fillStyle = pal.joint; g.fillRect(37, 0, 2, 6);
+      g.fillStyle = pal.eye; g.fillRect(36, 0, 4, 2);
+      g.fillStyle = pal.head; rrect(g, 22 - B * 2, 5, 20 + B * 4, 15, 3); g.fill();
+      g.fillStyle = '#15181b'; g.fillRect(24 - B * 2, 10, 16 + B * 4, 6);
+      g.fillStyle = eye === 0 ? '#3a1a16' : eye > 1 ? pal.eyeHot : pal.eye; g.fillRect(25 - B * 2, 11, 14 + B * 4, 4);
+      if (eye) { g.fillStyle = eye > 1 ? '#ffffff' : pal.eyeCore; g.fillRect(30, 12, 4, 2); }
       if (pain) {
         g.setTransform(1, 0, 0, 1, 0, 0);
         g.globalCompositeOperation = 'source-atop';
@@ -497,17 +738,24 @@
       }
     });
   }
-  function drawWreck() {
+  function drawWreck(pal) {
     return paint(TEX, TEX, g => {
-      g.fillStyle = '#2a3036'; g.fillRect(6, 57, 16, 5); g.fillRect(42, 58, 14, 4);
-      g.fillStyle = '#6a737d'; rrect(g, 14, 49, 32, 13, 3); g.fill();
+      g.fillStyle = pal.leg; g.fillRect(6, 57, 16, 5); g.fillRect(42, 58, 14, 4);
+      g.fillStyle = pal.lo; rrect(g, 14, 49, 32, 13, 3); g.fill();
       g.fillStyle = '#f2b33d'; g.fillRect(17, 51, 4, 9); g.fillRect(23, 51, 3, 9);
       g.fillStyle = '#16181b'; g.fillRect(21, 51, 2, 9);
-      g.fillStyle = '#343a42'; g.fillRect(44, 51, 12, 11);
-      g.fillStyle = '#4a1814'; g.fillRect(46, 54, 8, 3);
+      g.fillStyle = pal.head; g.fillRect(44, 51, 12, 11);
+      g.fillStyle = '#3a1a16'; g.fillRect(46, 54, 8, 3);
       g.fillStyle = '#8a949f'; for (const [x, y] of [[10, 61], [28, 62], [36, 60], [58, 61], [3, 62]]) g.fillRect(x, y, 3, 2);
       g.fillStyle = '#ffb347'; g.fillRect(30, 47, 2, 2); g.fillRect(38, 45, 1, 1);
     });
+  }
+  function botSprites(pal) {
+    return {
+      idle: sprite(drawBot(pal, {})), walkA: sprite(drawBot(pal, { leg: 1 })), walkB: sprite(drawBot(pal, { leg: 2 })),
+      aim: sprite(drawBot(pal, { eye: 2 })), fire: sprite(drawBot(pal, { eye: 2, flash: true })), pain: sprite(drawBot(pal, { pain: 0.55 })),
+      die0: sprite(drawBot(pal, { tilt: 0.3, pain: 0.3 })), die1: sprite(drawBot(pal, { tilt: 0.85, sink: 6, eye: 0 })), wreck: sprite(drawWreck(pal)),
+    };
   }
   function drawMedkit() {
     return paint(TEX, TEX, g => {
@@ -611,9 +859,7 @@
   const WALL_TEX = [brickTex(), stoneTex(), woodTex(), techTex()];
   const FLOOR_TEX = floorTex(), CEIL_TEX = ceilTex();
   const SPR = {
-    idle: sprite(drawBot({})), walkA: sprite(drawBot({ leg: 1 })), walkB: sprite(drawBot({ leg: 2 })),
-    aim: sprite(drawBot({ eye: 2 })), fire: sprite(drawBot({ eye: 2, flash: true })), pain: sprite(drawBot({ pain: 0.55 })),
-    die0: sprite(drawBot({ tilt: 0.3, pain: 0.3 })), die1: sprite(drawBot({ tilt: 0.85, sink: 6, eye: 0 })), wreck: sprite(drawWreck()),
+    bots: { E: botSprites(PALETTES.E), R: botSprites(PALETTES.R), T: botSprites(PALETTES.T) },
     medkit: sprite(drawMedkit()), cells: sprite(drawCells()), lamp: sprite(drawLamp()), barrel: sprite(drawBarrel()),
     boom: [0, 1, 2, 3].map(i => sprite(drawBoom(i))), spark: [0, 1].map(i => sprite(drawSpark(i))),
   };
@@ -666,6 +912,7 @@
       shoot: sound((o, t) => { tone(o, 'square', 1500, 160, t, 0.11, 0.18); hiss(o, 'bandpass', 3200, 420, t, 0.15, 0.6); tone(o, 'sine', 170, 45, t, 0.17, 0.65); }),
       empty: sound((o, t) => tone(o, 'square', 1900, 1700, t, 0.03, 0.12)),
       botShoot: sound((o, t) => { tone(o, 'sawtooth', 950, 130, t, 0.2, 0.3); hiss(o, 'highpass', 5000, 1800, t, 0.08, 0.18); }),
+      heavyShoot: sound((o, t) => { tone(o, 'sawtooth', 520, 70, t, 0.22, 0.34); hiss(o, 'bandpass', 1800, 300, t, 0.12, 0.35); }),
       botAlert: sound((o, t) => { tone(o, 'square', 740, 740, t, 0.07, 0.14); tone(o, 'square', 1110, 1110, t + 0.09, 0.08, 0.14); }),
       botPain: sound((o, t) => tone(o, 'square', 440, 150, t, 0.1, 0.22)),
       botDie: sound((o, t) => { tone(o, 'sawtooth', 560, 40, t, 0.6, 0.3); hiss(o, 'lowpass', 2600, 180, t, 0.45, 0.45); }),
@@ -684,16 +931,12 @@
   }
 
   // ---------------------------------------------------------------------------
-  // World
+  // World. Rebuilt from the level's map each time a level starts.
   // ---------------------------------------------------------------------------
-  const grid = new Uint8Array(MW * MH), lamps = [];
-  let spawn = { x: 1.5, y: 1.5 };
-  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-    const ch = LEVEL[y][x];
-    if (WALL_CODES[ch]) grid[y * MW + x] = WALL_CODES[ch];
-    else if (ch === 'P') spawn = { x: x + 0.5, y: y + 0.5 };
-    else if (ch === 'l') lamps.push({ x: x + 0.5, y: y + 0.5 });
-  }
+  let level = 0, skill = LEVELS[0].skill;
+  let MW = 0, MH = 0, grid = new Uint8Array(0), lamps = [], spawn = { x: 1.5, y: 1.5, a: 0 };
+  let LMW = 0, LMH = 0, lm = new Float32Array(0);
+  let barrelCell = new Uint8Array(0), flow = new Int16Array(0), queue = new Int16Array(0);
 
   function wallAt(x, y) {
     const cx = x | 0, cy = y | 0;
@@ -706,13 +949,27 @@
     return true;
   }
 
+  function loadLevel(n) {
+    const L = LEVELS[n];
+    level = n; skill = L.skill;
+    MH = L.map.length; MW = L.map[0].length;
+    grid = new Uint8Array(MW * MH); lamps = [];
+    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+      const ch = L.map[y][x];
+      if (WALL_CODES[ch]) grid[y * MW + x] = WALL_CODES[ch];
+      else if (ch === 'P') spawn = { x: x + 0.5, y: y + 0.5, a: FACING[L.facing] || 0 };
+      else if (ch === 'l') lamps.push({ x: x + 0.5, y: y + 0.5 });
+    }
+    barrelCell = new Uint8Array(MW * MH); flow = new Int16Array(MW * MH); queue = new Int16Array(MW * MH);
+    bakeLight(L.ambient);
+  }
+
   // Baked lighting: lamps light the tiles they can see, then the result is smoothed into a finer grid.
-  const LMW = MW * LMR, LMH = MH * LMR, lm = new Float32Array(LMW * LMH);
-  (function bakeLight() {
+  function bakeLight(ambient) {
     const cell = new Float32Array(MW * MH);
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       if (grid[y * MW + x]) continue;
-      let L = AMBIENT;
+      let L = ambient;
       for (const l of lamps) {
         const d = Math.hypot(x + 0.5 - l.x, y + 0.5 - l.y);
         if (d < LAMP_R && los(l.x, l.y, x + 0.5, y + 0.5)) L += LAMP_I * (1 - d / LAMP_R) ** 2;
@@ -727,8 +984,9 @@
         if (nx < 0 || ny < 0 || nx >= MW || ny >= MH || grid[ny * MW + nx]) continue;
         sum += cell[ny * MW + nx]; n++;
       }
-      cell[y * MW + x] = n ? sum / n : AMBIENT;
+      cell[y * MW + x] = n ? sum / n : ambient;
     }
+    LMW = MW * LMR; LMH = MH * LMR; lm = new Float32Array(LMW * LMH);
     const at = (x, y) => cell[Math.min(MH - 1, Math.max(0, y)) * MW + Math.min(MW - 1, Math.max(0, x))];
     for (let py = 0; py < LMH; py++) for (let px = 0; px < LMW; px++) {
       const wx = (px + 0.5) / LMR - 0.5, wy = (py + 0.5) / LMR - 0.5;
@@ -737,7 +995,7 @@
       const bottom = at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx;
       lm[py * LMW + px] = top * (1 - fy) + bottom * fy;
     }
-  })();
+  }
   function lightAt(x, y) {
     let ix = (x * LMR) | 0, iy = (y * LMR) | 0;
     if (ix < 0) ix = 0; else if (ix >= LMW) ix = LMW - 1;
@@ -747,30 +1005,51 @@
 
   const P = { x: 0, y: 0, a: 0, pitch: 0, hp: 100, ammo: START_AMMO, cool: 0, recoil: 0, flashT: 0, hurtT: 0, bob: 0, bobAmp: 0, moving: false, alive: true };
   const lookBy = px => { P.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, P.pitch + px)); };
+  const freshStats = () => ({ time: 0, shots: 0, hits: 0, kills: 0, taken: 0 });
   let enemies = [], items = [], barrels = [], effects = [];
-  let stats = { time: 0, shots: 0, hits: 0, kills: 0, taken: 0 };
+  let stats = freshStats(), run = freshStats();     // this level, and the levels finished so far this run
+  let entry = { hp: 100, ammo: START_AMMO };       // what you had when this level started, for retries
   let aliveCount = 0, totalBots = 0, flash = 0, glow = 0, shake = 0, winT = 0, deadT = 0, lastCell = -1;
-  const barrelCell = new Uint8Array(MW * MH), flow = new Int16Array(MW * MH), queue = new Int16Array(MW * MH);
 
-  function newGame() {
+  function newBot(type, x, y) {
+    const T = BOT_TYPES[type];
+    return { type, x, y, hp: T.hp, r: T.r, state: 'idle', t: 0, frame: 0, shots: 0, anim: Math.random() * 3, cool: 0, alert: false, heard: false, walking: false, strafeDir: Math.random() < 0.5 ? -1 : 1, strafeT: 1 };
+  }
+  function spawnEntities() {
     enemies = []; items = []; barrels = []; effects = [];
+    const map = LEVELS[level].map;
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-      const ch = LEVEL[y][x], cx = x + 0.5, cy = y + 0.5;
-      if (ch === 'E') enemies.push({ x: cx, y: cy, hp: BOT_HP, state: 'idle', t: 0, frame: 0, anim: Math.random() * 3, cool: 0, alert: false, heard: false, walking: false, strafeDir: Math.random() < 0.5 ? -1 : 1, strafeT: 1 });
+      const ch = map[y][x], cx = x + 0.5, cy = y + 0.5;
+      if (BOT_TYPES[ch]) enemies.push(newBot(ch, cx, cy));
       else if (ch === 'H') items.push({ x: cx, y: cy, kind: 'health', amount: 25, taken: false });
       else if (ch === 'A') items.push({ x: cx, y: cy, kind: 'ammo', amount: 12, taken: false });
       else if (ch === 'b') barrels.push({ x: cx, y: cy, alive: true, fuse: 0 });
     }
-    Object.assign(P, { x: spawn.x, y: spawn.y, a: 0, pitch: 0, hp: 100, ammo: START_AMMO, cool: 0, recoil: 0, flashT: 0, hurtT: 0, bob: 0, bobAmp: 0, moving: false, alive: true });
     totalBots = aliveCount = enemies.length;
-    stats = { time: 0, shots: 0, hits: 0, kills: 0, taken: 0 };
+  }
+  // Start level n. carry is the health and ammo to bring in; leave it out for a fresh start.
+  function startLevel(n, carry) {
+    loadLevel(n);
+    spawnEntities();
+    entry = { hp: carry ? carry.hp : 100, ammo: carry ? carry.ammo : START_AMMO };
+    Object.assign(P, { x: spawn.x, y: spawn.y, a: spawn.a, pitch: 0, hp: entry.hp, ammo: entry.ammo, cool: 0, recoil: 0, flashT: 0, hurtT: 0, bob: 0, bobAmp: 0, moving: false, alive: true });
+    stats = freshStats();
     flash = glow = shake = winT = deadT = 0;
     syncBarrels();
+    saveReached(n);
   }
   function syncBarrels() {
     barrelCell.fill(0);
     for (const b of barrels) if (b.alive) barrelCell[(b.y | 0) * MW + (b.x | 0)] = 1;
     lastCell = -1;
+  }
+
+  // The furthest level reached is remembered in this browser so you can continue later.
+  function reached() {
+    try { return Math.max(0, Math.min(LEVELS.length - 1, parseInt(localStorage.getItem(SAVE_KEY), 10) || 0)); } catch (e) { return 0; }
+  }
+  function saveReached(n) {
+    try { if (n > reached()) localStorage.setItem(SAVE_KEY, String(n)); } catch (e) { /* storage blocked; nothing to save */ }
   }
 
   // Bots find their way to you with a breadth-first "distance to player" map, rebuilt when you change tiles.
@@ -799,7 +1078,7 @@
   function blocked(ent, ox, oy, nx, ny, r) {
     if (wallAt(nx - r, ny - r) || wallAt(nx + r, ny - r) || wallAt(nx - r, ny + r) || wallAt(nx + r, ny + r)) return true;
     for (const b of barrels) if (b.alive && pushesInto(b.x, b.y, ox, oy, nx, ny, r + 0.3)) return true;
-    for (const e of enemies) if (e !== ent && e.state !== 'dead' && e.state !== 'dying' && pushesInto(e.x, e.y, ox, oy, nx, ny, r + BOT_R)) return true;
+    for (const e of enemies) if (e !== ent && e.state !== 'dead' && e.state !== 'dying' && pushesInto(e.x, e.y, ox, oy, nx, ny, r + e.r)) return true;
     if (ent !== P && P.alive && pushesInto(P.x, P.y, ox, oy, nx, ny, r + PLAYER_R)) return true;
     return false;
   }
@@ -846,13 +1125,13 @@
     for (const e of enemies) {
       if (e.alert || e.state !== 'idle') continue;
       const v = flow[(e.y | 0) * MW + (e.x | 0)];
-      if (v >= 0 && v <= HEAR_STEPS) e.heard = true;
+      if (v >= 0 && v <= skill.hear) e.heard = true;
     }
     setCamera();
     let best = null, bestD = zbuf[HW | 0], kind = '';
     for (const e of enemies) {
       if (e.state === 'dead' || e.state === 'dying') continue;
-      const d = hitDepth(e.x, e.y, botFrame(e), 1);
+      const d = hitDepth(e.x, e.y, botFrame(e), BOT_TYPES[e.type].scale);
       if (d > 0 && d < bestD) { bestD = d; best = e; kind = 'bot'; }
     }
     for (const b of barrels) {
@@ -881,11 +1160,12 @@
 
   function alertBot(e) {
     if (e.alert) return;
-    e.alert = true; e.state = 'chase'; e.cool = 0.35 + Math.random() * 0.6;
+    e.alert = true; e.state = 'chase'; e.cool = (0.35 + Math.random() * 0.6) * skill.react;
     sfx.botAlert(...spatial(e.x, e.y));
   }
   function hurtBot(e, dmg) {
     if (e.state === 'dying' || e.state === 'dead') return;
+    const T = BOT_TYPES[e.type];
     e.hp -= dmg;
     alertBot(e);
     const [vol, pan] = spatial(e.x, e.y);
@@ -893,21 +1173,22 @@
       e.state = 'dying'; e.frame = 0; e.t = 0.14;
       aliveCount--; stats.kills++;
       sfx.botDie(vol, pan);
-      items.push({ x: e.x + (Math.random() - 0.5) * 0.4, y: e.y + (Math.random() - 0.5) * 0.4, kind: 'ammo', amount: 4, taken: false, drop: true });
-      toast(aliveCount ? `Bot down \u00b7 ${aliveCount} left` : 'All bots down');
+      items.push({ x: e.x + (Math.random() - 0.5) * 0.4, y: e.y + (Math.random() - 0.5) * 0.4, kind: T.drop[0], amount: T.drop[1], taken: false, drop: true });
+      toast(aliveCount ? `${T.name} down ${DOT} ${aliveCount} left` : 'All bots down');
       if (!aliveCount) winT = 1.6;
     } else {
       sfx.botPain(vol, pan);
-      if (Math.random() < 0.7) { e.state = 'pain'; e.t = 0.22; }   // a hit usually staggers, which cancels an aimed shot
+      if (Math.random() < T.pain) { e.state = 'pain'; e.t = 0.22; }   // a hit can stagger, which cancels an aimed shot or a burst
     }
   }
   function botFire(e) {
-    sfx.botShoot(...spatial(e.x, e.y));
+    const T = BOT_TYPES[e.type];
+    (T.burst > 1 ? sfx.heavyShoot : sfx.botShoot)(...spatial(e.x, e.y));
     if (!P.alive || !los(e.x, e.y, P.x, P.y)) return;
     const d = Math.hypot(P.x - e.x, P.y - e.y);
-    let chance = Math.max(0.3, Math.min(0.88, 0.95 - d * 0.06));
+    let chance = Math.max(0.25, Math.min(0.92, T.acc * skill.acc * (0.95 - d * 0.06)));
     if (P.moving) chance *= 0.75;
-    if (Math.random() < chance) damagePlayer(5 + ((Math.random() * 7) | 0));
+    if (Math.random() < chance) damagePlayer(Math.round(between(T.dmg) * skill.dmg));
   }
   function damagePlayer(n) {
     if (!P.alive) return;
@@ -932,13 +1213,14 @@
   function kick(amount) { if (!reduceMotion) shake = Math.max(shake, amount); }
 
   function botFrame(e) {
+    const s = SPR.bots[e.type];
     switch (e.state) {
-      case 'dead': return SPR.wreck;
-      case 'dying': return e.frame === 0 ? SPR.die0 : SPR.die1;
-      case 'pain': return SPR.pain;
-      case 'aim': return SPR.aim;
-      case 'fire': return SPR.fire;
-      default: return e.walking ? (((e.anim * 5) | 0) % 2 ? SPR.walkA : SPR.walkB) : SPR.idle;
+      case 'dead': return s.wreck;
+      case 'dying': return e.frame === 0 ? s.die0 : s.die1;
+      case 'pain': return s.pain;
+      case 'aim': return s.aim;
+      case 'fire': return e.t > BOT_TYPES[e.type].gap * 0.4 ? s.fire : s.aim;   // the flash flickers through a burst
+      default: return e.walking ? (((e.anim * 5) | 0) % 2 ? s.walkA : s.walkB) : s.idle;
     }
   }
 
@@ -949,22 +1231,32 @@
       if ((e.t -= dt) <= 0) { if (e.frame === 0) { e.frame = 1; e.t = 0.14; } else e.state = 'dead'; }
       return;
     }
+    const T = BOT_TYPES[e.type];
     e.walking = false;
     const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 0.001;
-    const see = P.alive && d < 15 && los(e.x, e.y, P.x, P.y);
+    const see = P.alive && d < 16 && los(e.x, e.y, P.x, P.y);
     if (!e.alert) {
-      if ((see && d < 11) || e.heard) alertBot(e);
+      if ((see && d < skill.sight) || e.heard) alertBot(e);
       return;
     }
     e.cool -= dt;
     if (e.state === 'pain') { if ((e.t -= dt) <= 0) e.state = 'chase'; return; }
-    if (e.state === 'aim') { if ((e.t -= dt) <= 0) { botFire(e); e.state = 'fire'; e.t = 0.16; } return; }
-    if (e.state === 'fire') { if ((e.t -= dt) <= 0) { e.state = 'chase'; e.cool = 0.9 + Math.random() * 1.2; } return; }
+    if (e.state === 'aim') {
+      if ((e.t -= dt) <= 0) { e.shots = T.burst; botFire(e); e.state = 'fire'; e.t = T.gap; }
+      return;
+    }
+    if (e.state === 'fire') {
+      if ((e.t -= dt) <= 0) {
+        if (--e.shots > 0) { botFire(e); e.t = T.gap; }
+        else { e.state = 'chase'; e.cool = between(T.cool) * skill.cool; }
+      }
+      return;
+    }
 
-    if (see && e.cool <= 0 && d < 12) { e.state = 'aim'; e.t = 0.4; return; }   // the eye flares white just before it fires
-    let tx, ty, speed = BOT_SPEED;
+    if (see && e.cool <= 0 && d < 12) { e.state = 'aim'; e.t = T.aim * skill.react; return; }   // the eye flares just before it fires
+    let tx, ty, speed = T.speed;
     if (see && d < 3.5) {
-      // Close in? No: sidestep while waiting for the next shot.
+      // Close enough: sidestep while waiting for the next shot.
       if ((e.strafeT -= dt) <= 0) { e.strafeDir = -e.strafeDir; e.strafeT = 0.7 + Math.random() * 1.1; }
       tx = e.x - (dy / d) * e.strafeDir; ty = e.y + (dx / d) * e.strafeDir; speed *= 0.6;
     } else if (see) {
@@ -980,7 +1272,7 @@
       tx = bx + 0.5; ty = by + 0.5;
     }
     const mx = tx - e.x, my = ty - e.y, md = Math.hypot(mx, my);
-    if (md > 0.02) { const k = (speed * dt) / md; move(e, mx * k, my * k, BOT_R); e.walking = true; }
+    if (md > 0.02) { const k = (speed * dt) / md; move(e, mx * k, my * k, e.r); e.walking = true; }
   }
 
   function collectItems() {
@@ -1042,7 +1334,11 @@
     flash = Math.max(0, flash - dt * 7);
     glow = Math.max(0, glow - dt * 3);
     shake = Math.max(0, shake - dt);
-    if (winT > 0 && (winT -= dt) <= 0) { setMode('won'); sfx.win(); }
+    if (winT > 0 && (winT -= dt) <= 0) {
+      for (const k in run) run[k] += stats[k];
+      setMode(level < LEVELS.length - 1 ? 'cleared' : 'won');
+      sfx.win();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1085,7 +1381,7 @@
       if (rdx < 0) { sx = -1; sdx = (P.x - mx) * ddx; } else { sx = 1; sdx = (mx + 1 - P.x) * ddx; }
       if (rdy < 0) { sy = -1; sdy = (P.y - my) * ddy; } else { sy = 1; sdy = (my + 1 - P.y) * ddy; }
       let side = 0, cell = 1;
-      for (let i = 0; i < 64; i++) {
+      for (let i = 0; i < 128; i++) {
         if (sdx < sdy) { sdx += ddx; mx += sx; side = 0; } else { sdy += ddy; my += sy; side = 1; }
         if (mx < 0 || my < 0 || mx >= MW || my >= MH) { cell = 1; break; }
         cell = grid[my * MW + mx];
@@ -1140,7 +1436,7 @@
     for (const l of lamps) pushSprite(l.x, l.y, SPR.lamp, 0.5, CEIL, true, 0);
     for (const b of barrels) if (b.alive) pushSprite(b.x, b.y, SPR.barrel, BARREL_SCALE, FLOOR, false, 0);
     for (const it of items) if (!it.taken) pushSprite(it.x, it.y, it.kind === 'health' ? SPR.medkit : SPR.cells, it.drop ? 0.32 : 0.42, FLOOR, false, -0.05 - 0.03 * Math.sin(T * 3 + it.x * 2));
-    for (const e of enemies) pushSprite(e.x, e.y, botFrame(e), 1, FLOOR, false, 0);
+    for (const e of enemies) pushSprite(e.x, e.y, botFrame(e), BOT_TYPES[e.type].scale, FLOOR, false, 0);
     for (const f of effects) {
       if (f.kind === 'boom') pushSprite(f.x, f.y, SPR.boom[Math.min(3, ((f.t / f.life) * 4) | 0)], 1.15, FLOOR, true, 0);
       else pushSprite(f.x, f.y, SPR.spark[f.t < f.life / 2 ? 0 : 1], f.size, MID, true, 0, f.z);
@@ -1178,7 +1474,7 @@
 
   const MAP_WALL = ['', '#8a4434', '#6f7781', '#8a6236', '#4f6f8f'];
   function drawMap() {
-    const s = mapCv.width / MW;
+    const s = mapCv.width / Math.max(MW, MH);
     mctx.clearRect(0, 0, mapCv.width, mapCv.height);
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       const c = grid[y * MW + x];
@@ -1192,13 +1488,14 @@
       mctx.moveTo(P.x * s, P.y * s); mctx.lineTo(hitX[c] * s, hitY[c] * s);
     }
     mctx.stroke();
-    for (const it of items) if (!it.taken) { mctx.fillStyle = it.kind === 'health' ? C.text : C.cell; mctx.fillRect(it.x * s - 2, it.y * s - 2, 4, 4); }
+    const dot = Math.max(3, s * 0.5);
+    for (const it of items) if (!it.taken) { mctx.fillStyle = it.kind === 'health' ? C.text : C.cell; mctx.fillRect(it.x * s - dot / 2, it.y * s - dot / 2, dot, dot); }
     mctx.fillStyle = '#6fa85c';
-    for (const b of barrels) if (b.alive) { mctx.beginPath(); mctx.arc(b.x * s, b.y * s, 2.5, 0, Math.PI * 2); mctx.fill(); }
+    for (const b of barrels) if (b.alive) { mctx.beginPath(); mctx.arc(b.x * s, b.y * s, s * 0.32, 0, Math.PI * 2); mctx.fill(); }
     mctx.fillStyle = C.alarm;
-    for (const e of enemies) if (e.state !== 'dead' && e.state !== 'dying') { mctx.beginPath(); mctx.arc(e.x * s, e.y * s, 3, 0, Math.PI * 2); mctx.fill(); }
+    for (const e of enemies) if (e.state !== 'dead' && e.state !== 'dying') { mctx.beginPath(); mctx.arc(e.x * s, e.y * s, s * (e.type === 'T' ? 0.55 : 0.38), 0, Math.PI * 2); mctx.fill(); }
     mctx.save();
-    mctx.translate(P.x * s, P.y * s); mctx.rotate(P.a);
+    mctx.translate(P.x * s, P.y * s); mctx.rotate(P.a); mctx.scale(s / 8, s / 8);
     mctx.fillStyle = C.hazard;
     mctx.beginPath(); mctx.moveTo(7, 0); mctx.lineTo(-4, 4.5); mctx.lineTo(-1.5, 0); mctx.lineTo(-4, -4.5); mctx.closePath(); mctx.fill();
     mctx.restore();
@@ -1212,6 +1509,7 @@
   function updateHud() {
     const hp = Math.max(0, Math.ceil(P.hp));
     show('hp', ui.hp, hp); show('ammo', ui.ammo, P.ammo); show('bots', ui.bots, aliveCount);
+    show('lvl', ui.lvl, `${level + 1}/${LEVELS.length}`);
     ui.hpStat.classList.toggle('low', hp <= 25);
     ui.hpStat.classList.toggle('warn', hp > 25 && hp <= 50);
     ui.ammoStat.classList.toggle('low', P.ammo === 0);
@@ -1221,15 +1519,22 @@
     ui.hurt.style.opacity = Math.min(1, h).toFixed(3);
   }
 
-  let toastTimer = 0;
+  let toastTimer = 0, bannerTimer = 0;
   function toast(msg, ms = 1600) {
     ui.toast.textContent = msg;
     ui.toast.classList.add('on');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => ui.toast.classList.remove('on'), ms);
   }
+  function showBanner() {
+    ui.bannerEyebrow.textContent = `Level ${level + 1} of ${LEVELS.length}`;
+    ui.bannerTitle.textContent = LEVELS[level].name;
+    ui.banner.classList.add('on');
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => ui.banner.classList.remove('on'), 2600);
+  }
 
-  const accuracy = () => `${Math.round((100 * stats.hits) / Math.max(1, stats.shots))}%`;
+  const accuracy = s => `${Math.round((100 * s.hits) / Math.max(1, s.shots))}%`;
   function fillStats(el, rows) { el.innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join(''); }
 
   function setMode(m) {
@@ -1237,9 +1542,29 @@
     ui.overlay.hidden = m === 'play';
     for (const k in ui.screens) ui.screens[k].hidden = k !== m;
     if (m !== 'play') { mouseDown = false; if (document.pointerLockElement) document.exitPointerLock(); }
-    if (m === 'paused') ui.pauseLine.textContent = `${stats.kills} of ${totalBots} bots down \u00b7 ${fmtTime(stats.time)} on the clock`;
-    if (m === 'dead') fillStats(ui.deadStats, [['Bots down', `${stats.kills}/${totalBots}`], ['Time', fmtTime(stats.time)], ['Accuracy', accuracy()], ['Shots fired', stats.shots]]);
-    if (m === 'won') fillStats(ui.wonStats, [['Time', fmtTime(stats.time)], ['Accuracy', accuracy()], ['Damage taken', stats.taken], ['Shots fired', stats.shots]]);
+    const n = level + 1, name = LEVELS[level].name;
+    if (m === 'paused') {
+      $('pause-eyebrow').textContent = `Paused ${DOT} Level ${n}`;
+      $('pause-line').textContent = `${stats.kills} of ${totalBots} bots down ${DOT} ${fmtTime(stats.time)} on the clock`;
+    }
+    if (m === 'cleared') {
+      const next = LEVELS[level + 1];
+      saveReached(level + 1);
+      $('cleared-eyebrow').textContent = `Level ${n} of ${LEVELS.length} cleared`;
+      $('cleared-name').textContent = name;
+      fillStats($('cleared-stats'), [['Time', fmtTime(stats.time)], ['Accuracy', accuracy(stats)], ['Damage taken', stats.taken], ['Health left', Math.ceil(P.hp)]]);
+      $('next-eyebrow').textContent = `Next ${DOT} Level ${n + 1}`;
+      $('next-name').textContent = next.name;
+      $('next-brief').textContent = next.brief;
+      $('next-threat').textContent = threatLine(level + 1);
+      $('btn-next').textContent = `Enter level ${n + 1}`;
+    }
+    if (m === 'dead') {
+      $('dead-line').textContent = `Level ${n} ${DOT} ${name}`;
+      fillStats($('dead-stats'), [['Bots down', `${stats.kills}/${totalBots}`], ['Time', fmtTime(stats.time)], ['Accuracy', accuracy(stats)], ['Shots fired', stats.shots]]);
+      $('btn-retry').textContent = `Retry level ${n}`;
+    }
+    if (m === 'won') fillStats($('won-stats'), [['Total time', fmtTime(run.time)], ['Accuracy', accuracy(run)], ['Damage taken', run.taken], ['Bots destroyed', run.kills]]);
   }
   function begin() {
     sfx.init();
@@ -1248,8 +1573,10 @@
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     last = performance.now();
   }
+  function play(n, carry) { startLevel(n, carry); begin(); showBanner(); }
+  function newRun(n = 0, carry) { run = freshStats(); play(n, carry); }
 
-  // Pointer lock gives true mouse look. Where it's refused, the arrow keys still turn.
+  // Pointer lock gives true mouse look. Where it's refused, the keyboard still turns and looks.
   let lockPending = false, lockFails = 0;
   function requestLock() {
     if (lockPending || lockFails >= 2 || !view.requestPointerLock || document.pointerLockElement === view) return;
@@ -1262,7 +1589,7 @@
   function onLockError() {
     if (!lockPending) return;
     lockPending = false; lockFails++;
-    if (mode === 'play') toast(lockFails >= 2 ? 'Mouse look is off here. Look up and down with R F, turn with\u2190 \u2192 or Q E.' : 'Click the screen to turn on mouse look.', 2800);
+    if (mode === 'play') toast(lockFails >= 2 ? `Mouse look is off here. Look up and down with R F, turn with ${LEFT} ${RIGHT} or Q E.` : 'Click the screen to turn on mouse look.', 2800);
   }
   document.addEventListener('pointerlockerror', onLockError);
   document.addEventListener('pointerlockchange', () => {
@@ -1271,10 +1598,13 @@
     else if (mode === 'play') setMode('paused');
   });
 
-  $('btn-start').addEventListener('click', () => { newGame(); begin(); });
+  $('btn-start').addEventListener('click', () => newRun(0));
+  $('btn-continue').addEventListener('click', () => newRun(reached(), { hp: 100, ammo: 30 }));
   $('btn-resume').addEventListener('click', begin);
-  $('btn-retry').addEventListener('click', () => { newGame(); begin(); });
-  $('btn-again').addEventListener('click', () => { newGame(); begin(); });
+  $('btn-next').addEventListener('click', () => play(level + 1, { hp: Math.max(Math.ceil(P.hp), NEXT_MIN_HP), ammo: Math.max(P.ammo, NEXT_MIN_AMMO) }));
+  $('btn-retry').addEventListener('click', () => play(level, entry));
+  $('btn-restart').addEventListener('click', () => newRun(0));
+  $('btn-again').addEventListener('click', () => newRun(0));
 
   const GAME_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
   addEventListener('keydown', e => {
@@ -1285,7 +1615,7 @@
     else if (e.code === 'Escape' && mode === 'play') setMode('paused');
     else if (e.code === 'KeyP') { if (mode === 'play') setMode('paused'); else if (mode === 'paused') begin(); }
     else if (e.code === 'Enter' && mode !== 'play' && !(document.activeElement instanceof HTMLButtonElement)) {
-      const btn = ui.screens[mode] && ui.screens[mode].querySelector('button');
+      const btn = ui.screens[mode] && ui.screens[mode].querySelector('button:not([hidden])');
       if (btn) btn.click();
     }
   });
@@ -1310,6 +1640,12 @@
   });
 
   if (!matchMedia('(any-pointer: fine)').matches) $('touch-note').hidden = false;
+  const allBots = LEVELS.reduce((sum, _, i) => sum + Object.values(countBots(i)).reduce((a, b) => a + b, 0), 0);
+  $('start-eyebrow').textContent = `${LEVELS.length} levels ${DOT} ${allBots} bots`;
+  if (reached() > 0) {
+    $('btn-continue').hidden = false;
+    $('btn-continue').textContent = `Continue at level ${reached() + 1}`;
+  }
 
   function loop(now) {
     const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
@@ -1324,30 +1660,34 @@
   // Keep a game in progress when the page is updated while open.
   const hot = window.claude && window.claude.hot;
   try {
-    if (hot && hot.snapshot) hot.snapshot(() => ({ v: 1, mode, P: { ...P }, enemies, items, barrels, stats, aliveCount }));
+    if (hot && hot.snapshot) hot.snapshot(() => ({ v: 2, level, mode, P: { ...P }, enemies, items, barrels, stats, run, entry, aliveCount, totalBots }));
   } catch (e) { /* not running in a viewer */ }
   function boot(data) {
-    newGame();
-    if (data && data.v === 1 && Array.isArray(data.enemies)) {
+    if (data && data.v === 2 && Array.isArray(data.enemies) && LEVELS[data.level]) {
+      loadLevel(data.level);
       Object.assign(P, data.P);
-      enemies = data.enemies; items = data.items; barrels = data.barrels; stats = data.stats; aliveCount = data.aliveCount;
+      ({ enemies, items, barrels, stats, run, entry, aliveCount, totalBots } = data);
       syncBarrels();
       setMode(data.mode === 'play' ? 'paused' : data.mode);
-    } else setMode('start');
+    } else {
+      startLevel(0);
+      setMode('start');
+    }
     last = performance.now();
     requestAnimationFrame(loop);
   }
   if (hot && hot.ready) hot.ready(boot);
   else boot((hot && hot.data) || {});
 
-  // Testing hooks, only with #debug in the address: inspect state, time the renderer, step the simulation.
+  // Testing hooks, only with #debug in the address: inspect state, time the renderer, step the simulation, jump levels.
   if (location.hash === '#debug') {
     window.__maze = {
-      P, keys,
+      P, keys, LEVELS,
       get enemies() { return enemies; }, get items() { return items; }, get barrels() { return barrels; },
-      get mode() { return mode; }, get stats() { return stats; },
+      get mode() { return mode; }, get stats() { return stats; }, get run() { return run; }, get level() { return level; },
       bench(n = 30) { const t = performance.now(); for (let i = 0; i < n; i++) render(); return (performance.now() - t) / n; },
       tick(n = 1, dt = 1 / 60) { for (let i = 0; i < n && mode === 'play'; i++) { update(dt); if (i % 4 === 0) render(); } render(); updateHud(); },
+      goto(n, carry = { hp: 100, ammo: 99 }) { play(n, carry); },
     };
   }
 })();
